@@ -6,7 +6,7 @@ import os
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 RESULTS_DIR = os.path.join(PROJECT_ROOT, "results")
 BITNET_REPO = os.path.join(os.path.dirname(PROJECT_ROOT), "BitNet")
-BITNET_BENCHMARK_SCRIPT = os.path.join(BITNET_REPO, "e2e_benchmark.py")
+BITNET_BENCHMARK_SCRIPT = os.path.join(BITNET_REPO, "utils", "e2e_benchmark.py")
 BITNET_INFERENCE_SCRIPT = os.path.join(BITNET_REPO, "run_inference.py")
 
 # ── BitNet Models ──────────────────────────────────────────────────────────

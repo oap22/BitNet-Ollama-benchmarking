@@ -1,9 +1,9 @@
 """Run BitNet speed benchmarks via bitnet.cpp's e2e_benchmark.py."""
 
+import os
 import re
 import subprocess
 import time
-from typing import Optional
 
 from utils.ram_monitor import RAMMonitor
 
@@ -19,8 +19,12 @@ def run_bitnet_benchmark(
 
     Returns dict with keys: prefill_toks, decode_toks, peak_ram_mb, wall_time_s.
     """
+    # e2e_benchmark.py expects to be run from the BitNet repo root
+    # (it references build/bin/ with relative paths)
+    bitnet_repo = os.path.dirname(os.path.dirname(benchmark_script))
+
     cmd = [
-        "python", benchmark_script,
+        "python3", benchmark_script,
         "-m", model_path,
         "-p", str(prompt_tokens),
         "-n", str(gen_tokens),
@@ -29,7 +33,11 @@ def run_bitnet_benchmark(
 
     start = time.perf_counter()
     proc = subprocess.Popen(
-        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        cwd=bitnet_repo,
     )
 
     monitor = RAMMonitor(proc.pid)
@@ -39,42 +47,39 @@ def run_bitnet_benchmark(
     wall_time = time.perf_counter() - start
     peak_ram = monitor.stop()
 
-    if proc.returncode != 0:
+    # e2e_benchmark.py outputs to stderr and may exit with code 1
+    # even on success — check for actual data in output
+    output = stderr + stdout
+    result = parse_bitnet_output(output)
+
+    if result["prefill_toks"] == 0.0 and result["decode_toks"] == 0.0:
         raise RuntimeError(
-            f"BitNet benchmark failed (rc={proc.returncode}):\n{stderr}"
+            f"BitNet benchmark produced no timing data (rc={proc.returncode}):\n{output}"
         )
 
-    result = parse_bitnet_output(stdout)
     result["peak_ram_mb"] = round(peak_ram, 1)
     result["wall_time_s"] = round(wall_time, 3)
     return result
 
 
-def parse_bitnet_output(stdout: str) -> dict:
-    """Parse e2e_benchmark.py stdout for timing metrics.
+def parse_bitnet_output(output: str) -> dict:
+    """Parse e2e_benchmark.py output for timing metrics.
 
-    Expected output lines like:
-        prompt eval time: ... (X tokens per second)
-        eval time: ... (X tokens per second)
+    Output is a markdown table like:
+        | model | size | params | backend | ngl | threads | n_batch | test | t/s |
+        | ... | ... | ... | ... | ... | ... | ... | pp64 | 51.51 ± 0.28 |
+        | ... | ... | ... | ... | ... | ... | ... | tg64 | 50.87 ± 0.67 |
     """
     result = {"prefill_toks": 0.0, "decode_toks": 0.0}
 
-    # Match patterns like "X tokens per second" or "X tok/s"
+    # Match rows: | ... | ppN | VALUE ± STDDEV |
     prefill_match = re.search(
-        r"prompt eval.*?(\d+\.?\d*)\s*tokens?\s*per\s*second", stdout, re.IGNORECASE
+        r"\|\s*pp\d+\s*\|\s*(\d+\.?\d*)\s*±", output
     )
-    if not prefill_match:
-        prefill_match = re.search(
-            r"prompt eval.*?(\d+\.?\d*)\s*tok/s", stdout, re.IGNORECASE
-        )
-
+    # Match rows: | ... | tgN | VALUE ± STDDEV |
     decode_match = re.search(
-        r"(?<!prompt\s)eval.*?(\d+\.?\d*)\s*tokens?\s*per\s*second", stdout, re.IGNORECASE
+        r"\|\s*tg\d+\s*\|\s*(\d+\.?\d*)\s*±", output
     )
-    if not decode_match:
-        decode_match = re.search(
-            r"(?<!prompt\s)eval.*?(\d+\.?\d*)\s*tok/s", stdout, re.IGNORECASE
-        )
 
     if prefill_match:
         result["prefill_toks"] = float(prefill_match.group(1))

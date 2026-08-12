@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Cosmic Observatory Fractal Explorer</title>
+    <meta
+      name="description"
+      content="A cinematic WebGL Mandelbrot and Julia explorer with a cosmic observatory aesthetic."
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="spacefield" aria-hidden="true">
+      <div class="spacefield__nebula"></div>
+      <div class="spacefield__grain"></div>
+    </div>
+
+    <main class="app-shell">
+      <section class="panel intro-panel">
+        <p class="eyebrow">Fractal Observatory</p>
+        <h1>Chart luminous edges of the Mandelbrot sea.</h1>
+        <p class="lede">
+          A zero-build WebGL observatory for surveying the Mandelbrot set,
+          sampling Julia echoes, and drifting through a few hand-tuned
+          landmarks.
+        </p>
+
+        <div class="pill-row">
+          <span class="pill">Mandelbrot navigator</span>
+          <span class="pill">Linked Julia scope</span>
+          <span class="pill">Shader-powered color drift</span>
+        </div>
+
+        <div class="shortcut-list">
+          <div class="shortcut-item">
+            <span class="shortcut-key">Drag</span>
+            <span>Pan the current field</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">Wheel</span>
+            <span>Zoom into the cursor</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">Click</span>
+            <span>Lock or release the Julia seed</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">R / P / Space</span>
+            <span>Reset, cycle presets, pause ambient motion</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="viewport-shell">
+        <canvas
+          id="fractal-canvas"
+          class="fractal-canvas"
+          aria-label="Interactive fractal explorer"
+        ></canvas>
+
+        <div id="webgl-fallback" class="webgl-fallback" hidden>
+          <div class="webgl-fallback__card">
+            <p class="eyebrow eyebrow--small">WebGL Unavailable</p>
+            <h2>This observatory needs a WebGL-capable browser.</h2>
+            <p>
+              The current environment could not create a GPU rendering context,
+              so the fractal stage cannot be drawn here.
+            </p>
+          </div>
+        </div>
+
+        <div class="panel panel--overlay viewport-overlay">
+          <p class="overlay-label" id="mode-badge">Mandelbrot Navigator</p>
+          <p class="overlay-caption" id="overlay-caption">
+            Hover to sculpt the Julia echo. Click the stage to lock the seed.
+          </p>
+        </div>
+
+        <section class="panel preview-panel" aria-labelledby="preview-title">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow eyebrow--small">Linked Echo</p>
+              <h2 id="preview-title">Julia Scope</h2>
+            </div>
+            <button type="button" class="ghost-button" id="seed-lock-button">
+              Lock Seed
+            </button>
+          </div>
+
+          <div class="preview-canvas-shell">
+            <canvas
+              id="julia-canvas"
+              aria-label="Julia set preview linked to the explorer"
+            ></canvas>
+          </div>
+
+          <dl class="seed-readout">
+            <div class="seed-readout__item">
+              <dt>Seed</dt>
+              <dd id="seed-readout">-0.790000 + 0.150000i</dd>
+            </div>
+            <div class="seed-readout__item">
+              <dt>Status</dt>
+              <dd id="seed-status">Tracking cursor</dd>
+            </div>
+          </dl>
+        </section>
+      </section>
+
+      <aside class="panel control-panel expanded" id="control-panel">
+        <button
+          class="sheet-toggle"
+          id="sheet-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="control-content"
+        >
+          <span>Instruments</span>
+          <span class="sheet-toggle__hint">Open</span>
+        </button>
+
+        <div class="control-panel__content" id="control-content">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow eyebrow--small">Instrument Rack</p>
+              <h2>Flight Controls</h2>
+            </div>
+            <button type="button" class="ghost-button" id="reset-button">
+              Reset View
+            </button>
+          </div>
+
+          <label class="control">
+            <span>Preset</span>
+            <select id="preset-select" aria-label="Choose a fractal preset"></select>
+          </label>
+
+          <div class="control-grid">
+            <label class="control">
+              <span>Mode</span>
+              <select id="mode-select" aria-label="Choose fractal mode">
+                <option value="mandelbrot">Mandelbrot</option>
+                <option value="julia">Julia</option>
+              </select>
+            </label>
+
+            <label class="control">
+              <span>Palette</span>
+              <select id="palette-select" aria-label="Choose color palette">
+                <option value="solaris">Solaris</option>
+                <option value="aurora">Aurora</option>
+                <option value="eclipse">Eclipse</option>
+                <option value="tide">Tideglass</option>
+              </select>
+            </label>
+          </div>
+
+          <label class="control control--range">
+            <span>Iterations</span>
+            <div class="range-row">
+              <input
+                id="iterations-range"
+                type="range"
+                min="80"
+                max="520"
+                step="4"
+                value="220"
+              />
+              <output id="iterations-output" for="iterations-range">220</output>
+            </div>
+          </label>
+
+          <div class="toggle-row">
+            <button
+              type="button"
+              class="toggle-button is-active"
+              id="ambient-toggle"
+              aria-pressed="true"
+            >
+              Ambient Motion
+            </button>
+            <button
+              type="button"
+              class="toggle-button"
+              id="julia-lock-toggle"
+              aria-pressed="false"
+            >
+              Unlock Seed
+            </button>
+          </div>
+
+          <div class="status-chip" id="mode-hint-chip">
+            Cursor feeds Julia scope
+          </div>
+          <p class="microcopy" id="mode-hint">
+            The preview follows your pointer while the seed is unlocked.
+          </p>
+        </div>
+      </aside>
+
+      <section class="panel telemetry-panel" aria-label="Live telemetry">
+        <div class="telemetry-grid">
+          <div class="telemetry-item">
+            <span class="telemetry-label">Zoom</span>
+            <strong id="zoom-readout">x1.0</strong>
+          </div>
+          <div class="telemetry-item">
+            <span class="telemetry-label">Coordinate</span>
+            <strong id="coordinate-readout">-0.500000 + 0.000000i</strong>
+          </div>
+          <div class="telemetry-item">
+            <span class="telemetry-label">Mode</span>
+            <strong id="telemetry-mode">Mandelbrot</strong>
+          </div>
+          <div class="telemetry-item">
+            <span class="telemetry-label">Iterations</span>
+            <strong id="telemetry-iterations">220</strong>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>
